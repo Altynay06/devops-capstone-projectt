@@ -123,4 +123,44 @@ class TestAccountService(TestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_415_UNSUPPORTED_MEDIA_TYPE)
 
-    # ADD YOUR TEST CASES HERE ...
+    def test_list_accounts(self):
+        accounts = self._create_accounts(2)
+        response = self.client.get(BASE_URL)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual({row["id"] for row in response.get_json()}, {account.id for account in accounts})
+
+    def test_list_accounts_by_name(self):
+        account = self._create_accounts(1)[0]
+        response = self.client.get(BASE_URL, query_string={"name": account.name})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual([row["id"] for row in response.get_json()], [account.id])
+
+    def test_read_account(self):
+        account = self._create_accounts(1)[0]
+        response = self.client.get(f"{BASE_URL}/{account.id}")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.get_json()["name"], account.name)
+
+    def test_read_missing_account(self):
+        response = self.client.get(f"{BASE_URL}/0")
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_update_account(self):
+        account = self._create_accounts(1)[0]
+        body = account.serialize()
+        body["address"] = "123 Updated Street"
+        url = f"{BASE_URL}/{account.id}"
+        response = self.client.put(url, json=body)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(self.client.get(url).get_json()["address"], body["address"])
+
+    def test_update_missing_account(self):
+        response = self.client.put(f"{BASE_URL}/0", json=AccountFactory().serialize())
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_delete_account(self):
+        account = self._create_accounts(1)[0]
+        url = f"{BASE_URL}/{account.id}"
+        self.assertEqual(self.client.delete(url).status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(self.client.get(url).status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(self.client.delete(url).status_code, status.HTTP_204_NO_CONTENT)

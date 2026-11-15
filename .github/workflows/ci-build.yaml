@@ -36,3 +36,37 @@ jobs:
         run: flake8 service tests --select=E9,F63,F7,F82 --show-source --statistics
       - name: Run tests
         run: nosetests -v --with-coverage --cover-package=service
+
+      - name: Exercise Accounts API with curl
+        shell: bash
+        run: |
+          gunicorn --bind 127.0.0.1:8080 service:app > accounts-server.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          base=http://127.0.0.1:8080
+          for attempt in {1..20}; do
+            if curl --silent --fail --output /dev/null "$base/health"; then
+              break
+            fi
+            sleep 1
+          done
+          if ! curl --silent --fail --output /dev/null "$base/health"; then
+            cat accounts-server.log
+            exit 1
+          fi
+
+          set -x
+          curl --silent --show-error --fail-with-body --include --request POST \
+            --header 'Content-Type: application/json' \
+            --data '{"name":"Demo Customer","email":"demo@example.com","address":"1 Demo Street"}' \
+            "$base/accounts" | tee rest-create-done.txt
+          resource=$(awk 'tolower($1) == "location:" { sub(/\r$/, "", $2); print $2 }' rest-create-done.txt)
+          test -n "$resource"
+          curl --silent --show-error --fail-with-body --include "$base/accounts" | tee rest-list-done.txt
+          curl --silent --show-error --fail-with-body --include "$resource" | tee rest-read-done.txt
+          curl --silent --show-error --fail-with-body --include --request PUT \
+            --header 'Content-Type: application/json' \
+            --data '{"name":"Demo Customer","email":"demo@example.com","address":"2 Demo Street"}' \
+            "$resource" | tee rest-update-done.txt
+          curl --silent --show-error --fail-with-body --include --request DELETE "$resource" | tee rest-delete-done.txt
+          set +x
