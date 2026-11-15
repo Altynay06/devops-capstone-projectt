@@ -79,3 +79,26 @@ jobs:
           docker run --detach --name accounts --network host --env DATABASE_URI accounts:1.0
           trap 'docker logs accounts; docker rm -f accounts' EXIT
           curl --fail --silent --show-error --retry 10 --retry-connrefused --retry-delay 1 http://localhost:8080/
+
+      - name: Set up kind
+        uses: helm/kind-action@v1
+        with:
+          version: v0.27.0
+          cluster_name: accounts-ci
+
+      - name: Deploy and verify Accounts on Kubernetes
+        shell: bash
+        run: |
+          kind load docker-image accounts:1.0 --name accounts-ci
+          kubectl create secret generic accounts-database --from-literal=password="$(openssl rand -hex 24)"
+          kubectl apply -f deploy/postgres.yaml
+          kubectl rollout status deployment/accounts-postgres --timeout=180s
+          kubectl apply -f deploy/accounts.yaml
+          kubectl rollout status deployment/accounts --timeout=180s
+          kubectl get deployments,pods,replicasets,services -o wide | tee kube-deploy-accounts.txt
+
+          kubectl port-forward service/accounts 8080:8080 > accounts-port-forward.log 2>&1 &
+          forward_pid=$!
+          trap 'kill "$forward_pid" 2>/dev/null || true' EXIT
+          curl --fail --silent --show-error --retry 10 --retry-connrefused --retry-delay 1 \
+            http://127.0.0.1:8080/ | tee kube-app-output.txt

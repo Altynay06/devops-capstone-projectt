@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: accounts-postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: accounts-postgres
+  template:
+    metadata:
+      labels:
+        app: accounts-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: accounts-database
+                  key: password
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-h", "127.0.0.1", "-U", "postgres"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: accounts-postgres
+spec:
+  selector:
+    app: accounts-postgres
+  ports:
+    - port: 5432
+      targetPort: postgres
