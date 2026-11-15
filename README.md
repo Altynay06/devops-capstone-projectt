@@ -35,7 +35,7 @@ The goal is to develop, test, secure, containerize, and deploy an Accounts REST 
 
 ## Build Status
 
-GitHub Actions CI workflow will be configured during the CI stage.
+[![Accounts CI](https://github.com/Altynay06/devops-capstone-projectt/actions/workflows/ci-build.yaml/badge.svg?branch=main)](https://github.com/Altynay06/devops-capstone-projectt/actions/workflows/ci-build.yaml)
 
 ## Project Structure
 
