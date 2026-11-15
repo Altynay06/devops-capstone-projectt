@@ -102,3 +102,26 @@ jobs:
           trap 'kill "$forward_pid" 2>/dev/null || true' EXIT
           curl --fail --silent --show-error --retry 10 --retry-connrefused --retry-delay 1 \
             http://127.0.0.1:8080/ | tee kube-app-output.txt
+
+      - name: Run Tekton deployment pipeline
+        shell: bash
+        run: |
+          kubectl apply -f https://storage.googleapis.com/tekton-releases/pipeline/previous/v1.0.0/release.yaml
+          kubectl -n tekton-pipelines rollout status deployment --timeout=240s
+
+          kubectl create namespace accounts-cd
+          kubectl -n accounts-cd create secret generic accounts-database --from-literal=password="$(openssl rand -hex 24)"
+          kubectl -n accounts-cd apply -f deploy/postgres.yaml
+          kubectl -n accounts-cd rollout status deployment/accounts-postgres --timeout=180s
+          kubectl -n accounts-cd create configmap accounts-manifests --from-file=deploy/accounts.yaml
+          kubectl -n accounts-cd apply -f tekton/pipeline.yaml
+          kubectl -n accounts-cd apply -f tekton/pipeline-run.yaml
+
+          run_ok=0
+          kubectl -n accounts-cd wait --for=condition=Succeeded pipelinerun/accounts-cd --timeout=300s || run_ok=1
+          {
+            kubectl -n accounts-cd get pipelinerun accounts-cd
+            kubectl -n accounts-cd get taskruns
+            kubectl -n accounts-cd logs -l tekton.dev/pipelineRun=accounts-cd --all-containers --prefix || true
+          } | tee pipelinerun.txt
+          test "$run_ok" -eq 0

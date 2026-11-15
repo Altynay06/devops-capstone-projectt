@@ -1,0 +1,11 @@
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  name: accounts-cd
+spec:
+  pipelineRef:
+    name: accounts-cd
+  taskRunTemplate:
+    serviceAccountName: accounts-deployer
+  timeouts:
+    pipeline: 10m
