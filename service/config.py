@@ -21,3 +21,11 @@ SQLALCHEMY_TRACK_MODIFICATIONS = False
 
 # Secret for session management
 SECRET_KEY = os.getenv("SECRET_KEY", "s3cr3t-key-shhhh")
+
+# Configure trusted browser clients and enable HTTPS redirects for deployments.
+CORS_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
+    if origin.strip()
+]
+FORCE_HTTPS = os.getenv("FORCE_HTTPS", "false").lower() == "true"

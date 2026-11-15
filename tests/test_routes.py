@@ -164,3 +164,24 @@ class TestAccountService(TestCase):
         self.assertEqual(self.client.delete(url).status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(self.client.get(url).status_code, status.HTTP_404_NOT_FOUND)
         self.assertEqual(self.client.delete(url).status_code, status.HTTP_204_NO_CONTENT)
+
+    def test_security_headers(self):
+        response = self.client.get("/")
+        self.assertEqual(response.headers["X-Content-Type-Options"], "nosniff")
+        self.assertIn("default-src", response.headers["Content-Security-Policy"])
+
+    def test_cors_allows_configured_origin(self):
+        response = self.client.options(
+            BASE_URL,
+            headers={
+                "Origin": "http://localhost:3000",
+                "Access-Control-Request-Method": "POST",
+                "Access-Control-Request-Headers": "Content-Type",
+            },
+        )
+        self.assertEqual(response.headers["Access-Control-Allow-Origin"], "http://localhost:3000")
+        self.assertIn("POST", response.headers["Access-Control-Allow-Methods"])
+
+    def test_cors_denies_other_origins(self):
+        response = self.client.get(BASE_URL, headers={"Origin": "https://untrusted.example"})
+        self.assertNotIn("Access-Control-Allow-Origin", response.headers)
